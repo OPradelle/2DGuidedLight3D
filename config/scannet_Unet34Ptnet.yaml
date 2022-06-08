@@ -1,0 +1,37 @@
+DATA:
+  data_root: #DATAS PARENT FOLDER
+  output_name: #OUTPUT NAME
+  save_dir: #OUTPUT FOLDER
+  half_precision: 1
+
+NETWORK:
+  nb_class: 20
+  ptnet_feat: 61
+
+TRAIN:
+  lr: 0.01
+  momentum: 0.9
+  weight_decay: 0.00005
+  batch_size: 2
+  epoch_number: 50
+  print_rate: 500
+  save_rate: 1
+  div_rate: 5
+  div_factor: 0.5
+  gpu: ["0"]                                                       #ONLY MANAGE MONO GPU FOR NOW
+  train_file: #PATH TO THE TRAIN LIST FILES
+  eval_file:  #PATH TO THE VAL LIST FILES
+  num_workers: 0
+  ignore_label: 255
+  img_size: [320, 240]
+  checkpoint: "" #PATH TO THE CHECKPOINT TO RESUME TRAINING IF ANY
+
+
+TEST:
+  batch_size: 8
+  print_rate: 200
+  gpu: ["0"]
+  test_file: #PATH TO THE TEST LIST FILES
+  num_workers: 0
+  ignore_label: 255
+  img_size: [320, 240]
