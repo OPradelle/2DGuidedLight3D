@@ -62,14 +62,11 @@ class PointNetfeat(nn.Module):
         if self.feature_transform:
             self.fstn = STNkd(k=64)
 
-        self.block1 = nn.Sequential(nn.Conv1d(nb_feature, 64, 1, bias=False),
-                                    nn.BatchNorm1d(64, momentum=0.1),
+        self.block1 = nn.Sequential(nn.Conv1d(nb_feature, 64, 1, bias=True),
                                     nn.ReLU())
-        self.block2 = nn.Sequential(nn.Conv1d(64, 128, 1, bias=False),
-                                    nn.BatchNorm1d(128, momentum=0.1),
+        self.block2 = nn.Sequential(nn.Conv1d(64, 128, 1, bias=True),
                                     nn.ReLU())
-        self.block3 = nn.Sequential(nn.Conv1d(128, 1024, 1, bias=False),
-                                    nn.BatchNorm1d(1024, momentum=0.1))
+        self.block3 = nn.Sequential(nn.Conv1d(128, 1024, 1, bias=True))
 
     def forward(self, x, mask=None):
         nb_pts = x.shape[2]
@@ -120,16 +117,13 @@ class PointNet(nn.Module):
         self.pointNet = PointNetfeat(3, input_transform=False, feature_transform=False, out_feat=True)
         self.out_feat = out_feat
 
-        self.seg_head1 = nn.Sequential(nn.Conv1d(1088, 512, 1, bias=False),
-                                       nn.BatchNorm1d(512, momentum=0.1),
+        self.seg_head1 = nn.Sequential(nn.Conv1d(1088, 512, 1, bias=True),
                                        nn.ReLU())
 
-        self.seg_head2 = nn.Sequential(nn.Conv1d(512, 256, 1, bias=False),
-                                       nn.BatchNorm1d(256, momentum=0.1),
+        self.seg_head2 = nn.Sequential(nn.Conv1d(512, 256, 1, bias=True),
                                        nn.ReLU())
 
-        self.seg_head3 = nn.Sequential(nn.Conv1d(256, 128, 1, bias=False),
-                                       nn.BatchNorm1d(128, momentum=0.1),
+        self.seg_head3 = nn.Sequential(nn.Conv1d(256, 128, 1, bias=True),
                                        nn.ReLU())
 
         self.out = nn.Conv1d(128, self.out_feat, 1)

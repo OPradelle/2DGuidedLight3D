@@ -4,6 +4,8 @@ import torch
 from torch.utils.data import Dataset
 from torchvision import transforms
 from numpy.linalg import inv
+import random
+import cv2
 
 from lib.utils.label_map import convert_label, ScannetLabel
 
@@ -11,9 +13,16 @@ from lib.utils.label_map import convert_label, ScannetLabel
 mean = [0.485, 0.456, 0.406]
 std = [0.229, 0.224, 0.225]
 
+def random_mirror(rgb, gt, proj):
+    if random.random() >= 0.5:
+        rgb = cv2.flip(rgb, 1)
+        gt = cv2.flip(gt, 1)
+        proj = cv2.flip(proj, 1)
+    return rgb, gt, proj
+
 
 class FrustrumDataloader(Dataset):
-    def __init__(self, list_files, img_size, ignore_label, half_precision=False):
+    def __init__(self, list_files, img_size, ignore_label, test=False):
         self.files = list_files
         self.img_size = img_size
         self.label_mapping = ScannetLabel.label_map_Nyu40
@@ -22,10 +31,7 @@ class FrustrumDataloader(Dataset):
         self.t = transforms.Compose(
             [transforms.ToTensor(), transforms.Normalize(mean, std)])
 
-        if half_precision:
-            self.d_type = torch.float16
-        else:
-            self.d_type = torch.float32
+        self.test = test
 
     def getImg(self, index):
         """
@@ -51,7 +57,7 @@ class FrustrumDataloader(Dataset):
         label = np.array(label, dtype=np.int_)
         label = convert_label(label, self.label_mapping)
 
-        img = self.t(img).to(self.d_type)
+        img = self.t(img)
         label = torch.from_numpy(np.array(label, dtype=np.int_))
 
         return img, label, filename
@@ -106,18 +112,16 @@ class FrustrumDataloader(Dataset):
         pose = np.loadtxt(self.files[index][4])
         rot, t = self.invertMatrix3x4(pose)
 
-        cloud = np.einsum('mk,ik->im', rot, cloud)
-        cloud = cloud + t
-
         frustrum_ids = np.load(self.files[index][5])[name.split("/")[1].split(".")[0]]
         pts_frustrum = cloud[frustrum_ids]
+
+        pts_frustrum = np.einsum('mk,ik->im', rot, pts_frustrum)
+        pts_frustrum = pts_frustrum + t
 
         id_proj = idProj[idProj != -1]
         map = np.searchsorted(frustrum_ids, id_proj)
 
-        idProj[idProj != -1] = torch.arange(0, id_proj.shape[0], dtype=torch.long)
-
-        return torch.from_numpy(pts_frustrum).type(self.d_type), torch.from_numpy(map)
+        return torch.from_numpy(pts_frustrum).type(torch.float32), torch.from_numpy(map)
 
     def __getitem__(self, index):
         """
@@ -136,19 +140,25 @@ class FrustrumDataloader(Dataset):
 
         cloud, map = self.getCloudFrustrum(index, idProj, filename)
 
-        return img, label, filename, idProj, cloud, map
+        if self.test:
+            return img, label, filename, idProj, cloud, map
+
+        img, label, idProj = random_mirror(img.permute(1,2,0).numpy(), label.numpy(), idProj.numpy())
+
+        return torch.from_numpy(img).permute(2, 0, 1), torch.from_numpy(label).type(torch.long), filename, torch.from_numpy(idProj), cloud, map
 
     def __len__(self):
         return len(self.files)
 
 
-def readSetFromFiles(train_list_file, eval_list_file, test_list_file, data_path):
+def readSetFromFiles(train_list_file, eval_list_file, test_list_file, data_path, img_size):
     """
         Args:
             train_list_file (str): The path to the training list file.
             eval_list_file (str):  The path to the evaluation list file.
             test_list_file (str):  The path to the test list file.
             data_path (str):       The data parent folder.
+            img_size (str):        The image size.
         Returns:
             [(str)]: The set of files for each training's images.
                      (RGB path, GT path, proj path, cloud path, camera path, frustrum's point ids)
@@ -161,49 +171,58 @@ def readSetFromFiles(train_list_file, eval_list_file, test_list_file, data_path)
     eval_list = []
     test_list = []
 
-    file = open(train_list_file, "r")
-    train = file.readlines()
-    file.close()
-    for line in train:
-        path = line.split("\n")[0]
-        rgb = data_path + path
-        label = rgb.replace("color", "label").replace(".jpg", ".png")
-        proj = rgb.split("/color")[0] + "/npProjOcc.npz"
-        cloud = rgb.split("/color")[0] + "/cloud.npz"
-        cam = rgb.replace("color", "cam/pose").replace(".jpg", ".txt")
-        frustrum = rgb.split("/color")[0] + "/ptsFrustrum.npz"
+    if train_list_file:
+        file = open(train_list_file, "r")
+        train = file.readlines()
+        file.close()
+        for line in train:
+            path = line.split("\n")[0]
+            rgb = data_path + path
+            label = rgb.replace("color", "label").replace(".jpg", ".png")
+            proj = rgb.split("/color")[0] + "/proj2sr_" + img_size + ".npz"
+            cloud = rgb.split("/color")[0] + "/cloud_rgbgt.npz"
+            cam = rgb.replace("color", "cam/pose").replace(".jpg", ".txt")
+            frustrum = rgb.split("/color")[0] + "/fustrum2sr_" + img_size + ".npz"
 
-        train_list.append((rgb, label, proj, cloud, cam, frustrum))
+            train_list.append((rgb, label, proj, cloud, cam, frustrum))
 
-    file = open(eval_list_file, "r")
-    eval = file.readlines()
-    file.close()
-    for line in eval:
-        path = line.split("\n")[0]
+    if eval_list_file:
+        file = open(eval_list_file, "r")
+        eval = file.readlines()
+        file.close()
+        for line in eval:
+            path = line.split("\n")[0]
+            name = path.split("color/")[1].split(".")[0]
+            if int(name)%100 != 0:
+                continue
 
-        rgb = data_path + path
-        proj = rgb.split("/color")[0] + "/npProjOcc.npz"
-        label = rgb.replace("color", "label").replace(".jpg", ".png")
-        cloud = rgb.split("/color")[0] + "/cloud.npz"
-        cam = rgb.replace("color", "cam/pose").replace(".jpg", ".txt")
-        frustrum = rgb.split("/color")[0] + "/ptsFrustrum.npz"
+            rgb = data_path + path
+            label = rgb.replace("color", "label").replace(".jpg", ".png")
+            proj = rgb.split("/color")[0] + "/proj2sr_" + img_size + ".npz"
+            cloud = rgb.split("/color")[0] + "/cloud_rgbgt.npz"
+            cam = rgb.replace("color", "cam/pose").replace(".jpg", ".txt")
+            frustrum = rgb.split("/color")[0] + "/fustrum2sr_" + img_size + ".npz"
 
-        eval_list.append((rgb, label, proj, cloud, cam, frustrum))
+            eval_list.append((rgb, label, proj, cloud, cam, frustrum))
 
-    file = open(test_list_file, "r")
-    test = file.readlines()
-    file.close()
-    for line in test:
-        path = line.split("\n")[0]
+    if test_list_file:
+        file = open(test_list_file, "r")
+        test = file.readlines()
+        file.close()
+        for line in test:
+            path = line.split("\n")[0]
+            name = path.split("color/")[1].split(".")[0]
+            if int(name)%100 != 0:
+                continue
 
-        rgb = data_path + path
-        proj = rgb.split("/color")[0] + "/npProjOcc.npz"
-        label = rgb.replace("color", "label").replace(".jpg", ".png")
-        cloud = rgb.split("/color")[0] + "/cloud.npz"
-        cam = rgb.replace("color", "cam/pose").replace(".jpg", ".txt")
-        frustrum = rgb.split("/color")[0] + "/ptsFrustrum.npz"
+            rgb = data_path + path
+            label = rgb.replace("color", "label").replace(".jpg", ".png")
+            proj = rgb.split("/color")[0] + "/proj2sr_" + img_size + ".npz"
+            cloud = rgb.split("/color")[0] + "/cloud_rgbgt.npz"
+            cam = rgb.replace("color", "cam/pose").replace(".jpg", ".txt")
+            frustrum = rgb.split("/color")[0] + "/fustrum2sr_" + img_size + ".npz"
 
-        test_list.append((rgb, label, proj, cloud, cam, frustrum))
+            test_list.append((rgb, label, proj, cloud, cam, frustrum))
 
     return train_list, eval_list, test_list
 
@@ -218,7 +237,7 @@ def getDataloader(cfg):
             (torch.Dataloader): The dataloader for test set.
     """
     train_set, eval_set, test_set = readSetFromFiles(cfg["TRAIN.train_file"], cfg["TRAIN.eval_file"],
-                                                     cfg["TEST.test_file"], cfg["DATA.data_root"])
+                                                     cfg["TEST.test_file"], cfg["DATA.data_root"], cfg["DATA.img_size"])
 
     img_size = cfg["TRAIN.img_size"]
     ignore_label = cfg["TRAIN.ignore_label"]
@@ -233,16 +252,15 @@ def getDataloader(cfg):
                                                drop_last=True,
                                                num_workers=cfg["TRAIN.num_workers"])
 
-    dataset_eval = FrustrumDataloader(eval_set, img_size, ignore_label)
+    dataset_eval = FrustrumDataloader(eval_set, img_size, ignore_label, True)
     eval_loader = torch.utils.data.DataLoader(dataset=dataset_eval,
                                               batch_size=batch_size,
                                               shuffle=False,
                                               collate_fn=collateFn,
                                               drop_last=True,
-                                              num_workers=cfg["TEST.num_workers"])
+                                              num_workers=cfg["EVAL.num_workers"])
 
-    dataset_test = FrustrumDataloader(test_set, cfg["TEST.img_size"], cfg["TEST.ignore_label"],
-                                      cfg["DATA.half_precision"])
+    dataset_test = FrustrumDataloader(test_set, cfg["TEST.img_size"], cfg["TEST.ignore_label"], True)
     test_loader = torch.utils.data.DataLoader(dataset=dataset_test,
                                               batch_size=cfg["TEST.batch_size"],
                                               shuffle=False,

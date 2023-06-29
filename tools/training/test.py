@@ -1,12 +1,15 @@
-import json
-import os
-
 import torch
 import numpy as np
+import argparse
+from pathlib import Path
 
-from dataloader.Dataloader import getDataloader
-from model.PtnetUnet import PtnetUnetEarly
+
+from lib.dataloader.Dataloader import getDataloader
+from lib.model.PtnetUnet import PtnetUnetEarly
 from PIL import Image
+
+from lib.utils.label_map import convert_label
+from lib.utils.utils import load_cfg
 
 SCANNET_COLOR_MAP = [
     (174., 199., 232.),
@@ -73,9 +76,6 @@ def test(net, eval_loader, output_path, colored_output=False):
 
                 out_img.save(output_path + names[id].split("/")[0] + "_" +
                              names[id].split("/")[1].split(".")[0] + ".png")
-
-            if i % config["TEST.print_rate"] == 0:
-                print(i, "/", len(eval_loader))
     exit(0)
 
 
@@ -105,4 +105,4 @@ def main():
 
     _, _, test_loader = getDataloader(config)
 
-    test(net, eval_loader, output_path)
+    test(net, test_loader, output_path)

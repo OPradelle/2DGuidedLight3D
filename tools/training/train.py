@@ -20,7 +20,7 @@ from lib.utils.utils import load_cfg
 
 def main():
     parser = argparse.ArgumentParser(description='2DGuided3D')
-    parser.add_argument('--config', type=str, default='../../config/scannet_Unet34Ptnet.yaml', help='config file')
+    parser.add_argument('--config', type=str, default='../../config/scannet_SegformerB2Ptnet.yaml', help='config file')
     args = parser.parse_args()
     assert args.config is not None
 
@@ -73,9 +73,9 @@ def training(net, device, train_loader, eval_loader, config):
     print("Start learning")
     lr = config["TRAIN.lr"]
     for epoch in range(starting_epoch, config["TRAIN.epoch_number"]):
-        if epoch % 5 == 4:
-            lr *= 0.5
 
+        if epoch!=0 and config["TRAIN.div_rate"]!=0 and config["TRAIN.div_rate"]%epoch == 0:
+            lr *= config["TRAIN.div_factor"]
         # train
         train_loss = train(net, device, criterion, epoch, train_loader, optimizer, config, lr)
         writer.add_scalar("loss", train_loss, epoch)
