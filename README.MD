@@ -20,9 +20,9 @@ The point cloud can be extract from the _vh_clean_2.ply files.
 
 ### Preprocessing
 
-We will later release the code to project points on the image plane, since the code used in the article comes from a private lib.\
+We will later release the code to project points on the image plane, since the code used in the article comes from a private lib.
 
-The methods for projecting point is explained in the Part 5.1 of the article.
+The methods for projecting point is explained in the Part 4.1 of the article.
 
 ### Organisation
 
