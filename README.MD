@@ -9,6 +9,8 @@ This repository contain the code for the article <em>Lightweight integration of 
 The code run using Python (3.6),  Pytorch (1.11.0) with CUDA support (CUDA > 11.0), and tensorboardx for dumping training files.\
 You can use Anaconda to create a Python3.6 environment using the environment.yml file.
 
+The pretrained weights and the projection data can be found at : https://drive.google.com/drive/folders/16THmP6KrF7lVpooOAXYxC4FmcOPqffpo?usp=sharing
+
 ## Data
 
 Download the ScanNet dataset (http://www.scan-net.org/) from the original website.
