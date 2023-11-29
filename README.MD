@@ -55,3 +55,14 @@ the id of visible points given in np array (WxH).
 
 To train the network, you can use the <em>train.py</em> file.\
 You will first need to fill up the config file for training parameter in the config folder.
+
+## Citation
+
+If you find this work or code is helpful in your research, please cite:
+
+	@article{Pradelle2023SMI,
+	  title = Lightweight integration of 3D features to improve 2D image segmentation,
+	  author = Olivier Pradelle and Raphaëlle Chaine and David Wendland and Julie Digne,
+	  journal = Computers & Graphics,
+	  year = 2023,
+	}
